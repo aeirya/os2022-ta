@@ -1,4 +1,5 @@
 package sample;
+
 public class ThreadSample3 {
     public static void main(String[] args) throws InterruptedException {
         Thread thread = new Thread(

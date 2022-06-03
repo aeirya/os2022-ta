@@ -1,12 +1,14 @@
 package util.storage;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 
 import util.network.connection.Connection;
 
 public class StorageApi {
     private final Connection connection;
-    private boolean interrupted;
 
     public StorageApi(int storagePort) throws IOException {
         connection = new Connection(storagePort);
@@ -16,28 +18,30 @@ public class StorageApi {
         connection.send(StorageRequest.OBTAIN);
         connection.send(index);
         connection.send(id);
-
-        String result = "";
-        while (!interrupted) {
-            if (connection.hasNextLine()) {
-                result = connection.receive();
-                break;
-            }
-        }
-        if (interrupted) {
-            interrupted = false;
+        try {
+            return awaitStorageResponse();
+        } catch (InterruptedException e) {
             connection.send(StorageRequest.CANCEL);
-            throw new InterruptedException();
+            throw e;
+        } catch (ExecutionException e) {
+            return -1;
         }
+    }
 
-        return Integer.parseInt(result);
+    private Integer awaitStorageResponse() throws InterruptedException, ExecutionException {
+        FutureTask<Integer> getStorageResponseTask = new FutureTask<>(
+            () -> Integer.parseInt(connection.receive())
+        );
+        Executors.newFixedThreadPool(1).execute(getStorageResponseTask);
+        
+        return getStorageResponseTask.get();
     }
 
     public void release() {
-        
+        /* TODO */
     }
 
     public void interrupt() {
-        interrupted = true;
+        connection.close();
     }
 }
